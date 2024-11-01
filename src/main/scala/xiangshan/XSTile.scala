@@ -31,7 +31,7 @@ import utility.{ChiselDB, Constantin, DFTResetSignals, DelayN, FileRegisters, Re
 import coupledL2.EnableCHI
 import coupledL2.tl2chi.PortIO
 import utility.sram.{SramBroadcastBundle, SramHelper}
-
+import xiangshan.backend.trace.TraceCoreInterface
 class XSTile()(implicit p: Parameters) extends LazyModule
   with HasXSParameter
   with HasSoCParameter
@@ -113,6 +113,7 @@ class XSTile()(implicit p: Parameters) extends LazyModule
       val reset_vector = Input(UInt(PAddrBits.W))
       val cpu_halt = Output(Bool())
       val hartIsInReset = Output(Bool())
+      val traceCoreInterface = new TraceCoreInterface
       val debugTopDown = new Bundle {
         val robHeadPaddr = Valid(UInt(PAddrBits.W))
         val l3MissMatch = Input(Bool())
@@ -144,6 +145,7 @@ class XSTile()(implicit p: Parameters) extends LazyModule
 
     l2top.module.io.hartIsInReset.resetInFrontend := core.module.io.resetInFrontend
     io.hartIsInReset := l2top.module.io.hartIsInReset.toTile
+    io.traceCoreInterface <> core.module.io.traceCoreInterface
 
     l2top.module.io.beu_errors.icache <> core.module.io.beu_errors.icache
     l2top.module.io.beu_errors.dcache <> core.module.io.beu_errors.dcache
