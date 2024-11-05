@@ -19,6 +19,7 @@ package xiangshan.cache
 import org.chipsalliance.cde.config.Parameters
 import chisel3._
 import chisel3.util._
+import freechips.rocketchip.tilelink.ClientStates // add dependency
 import utility.{SRAMTemplate, XSPerfAccumulate}
 import xiangshan.cache.CacheInstrucion._
 
@@ -29,10 +30,12 @@ class TagReadReq(implicit p: Parameters) extends DCacheBundle {
 
 class TagWriteReq(implicit p: Parameters) extends TagReadReq {
   val vaddr = UInt(vtagBits.W)
-  val tag = UInt(tagBits.W)
+  // actually is coh + tag
+  val tag = UInt((tagBits + ClientStates.width).W)
 }
 
 class TagEccWriteReq(implicit p: Parameters) extends TagReadReq {
+  // add coh bits in inital definition
   val ecc = UInt(eccTagBits.W)
 }
 
@@ -45,7 +48,7 @@ abstract class AbstractTagArray(implicit p: Parameters) extends DCacheModule {
 class TagArray(implicit p: Parameters) extends AbstractTagArray {
   val io = IO(new Bundle() {
     val read = Flipped(DecoupledIO(new TagReadReq))
-    val resp = Output(Vec(nWays, UInt(tagBits.W)))
+    val resp = Output(Vec(nWays, UInt((tagBits + ClientStates.width).W)))  // add 2bits for meta coh
     val write = Flipped(DecoupledIO(new TagWriteReq))
     // ecc
     val ecc_read = Flipped(DecoupledIO(new TagReadReq))
@@ -58,13 +61,14 @@ class TagArray(implicit p: Parameters) extends AbstractTagArray {
   val rstVal = 0.U
   val waddr = Mux(rst, rst_cnt, io.write.bits.idx)
   val wdata = Mux(rst, rstVal, io.write.bits.tag)
+  // 选择way
   val wmask = Mux(rst || (nWays == 1).B, (-1).asSInt, io.write.bits.way_en.asSInt).asBools
   val rmask = Mux(rst || (nWays == 1).B, (-1).asSInt, io.read.bits.way_en.asSInt).asBools
   when (rst) {
     rst_cnt := rst_cnt + 1.U
   }
 
-  val tag_array = Module(new SRAMTemplate(UInt(tagBits.W), set = nSets, way = nWays,
+  val tag_array = Module(new SRAMTemplate(UInt((tagBits + ClientStates.width).W), set = nSets, way = nWays,
     shouldReset = false, holdRead = false, singlePort = true))
 
   val ecc_array = TagEccParam.map {
@@ -73,7 +77,7 @@ class TagArray(implicit p: Parameters) extends AbstractTagArray {
       shouldReset = false, holdRead = false, singlePort = true))
     ecc
   }
-
+  // tag write
   val wen = rst || io.write.valid
   tag_array.io.w.req.valid := wen
   tag_array.io.w.req.bits.apply(
@@ -142,7 +146,7 @@ class DuplicatedTagArray(readPorts: Int)(implicit p: Parameters) extends Abstrac
 
   def getECCFromEncTag(encTag: UInt) = {
     require(encTag.getWidth == encTagBits)
-    encTag(encTagBits - 1, tagBits)
+    encTag(encTagBits - 1, tagBits  + ClientStates.width) // extract ecc bits
   }
 
   val tag_read_oh = WireInit(VecInit(Seq.fill(readPorts)(0.U(XLEN.W))))
