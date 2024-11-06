@@ -178,7 +178,7 @@ trait HasDCacheParameters extends HasL1CacheParameters with HasL1PrefetchSourceP
     // tag_write.ready -> tag_write.valid
     // tag_write.ready -> err_write.valid
     // tag_write.ready -> wb.valid
-  val nDupTagWriteReady = DCacheBanks + 4
+  // val nDupTagWriteReady = DCacheBanks + 4
   // In Main Pipe:
     // data_write.ready -> data_write.valid * 8 banks
     // data_write.ready -> meta_write.valid
@@ -187,7 +187,7 @@ trait HasDCacheParameters extends HasL1CacheParameters with HasL1PrefetchSourceP
     // data_write.ready -> wb.valid
   val nDupDataWriteReady = DCacheBanks + 4
   val nDupWbReady = DCacheBanks + 4
-  val nDupStatus = nDupTagWriteReady + nDupDataWriteReady
+  // val nDupStatus = nDupTagWriteReady + nDupDataWriteReady
   val dataWritePort = 0
   val metaWritePort = DCacheBanks
   val tagWritePort = metaWritePort + 1
@@ -1214,8 +1214,8 @@ class DCacheImp(outer: DCache) extends LazyModuleImp(outer) with HasDCacheParame
     val dataWriteArb_dup = Module(new Arbiter(new L1BankedDataWriteReqCtrl, 1))
     // dataWriteArb_dup.io.in(0).valid := refillPipe.io.data_write_dup(bank).valid
     // dataWriteArb_dup.io.in(0).bits := refillPipe.io.data_write_dup(bank).bits
-    dataWriteArb_dup.io.in(0).valid := mainPipe.io.data_write_dup(bank).valid
-    dataWriteArb_dup.io.in(0).bits := mainPipe.io.data_write_dup(bank).bits
+    dataWriteArb_dup.io.in(0).valid := mainPipe.io.data_write.valid
+    dataWriteArb_dup.io.in(0).bits := mainPipe.io.data_write.bits
 
     bankedDataArray.io.write_dup(bank) <> dataWriteArb_dup.io.out
   }
@@ -1489,9 +1489,9 @@ class DCacheImp(outer: DCache) extends LazyModuleImp(outer) with HasDCacheParame
   val mpStatus = mainPipe.io.status
   mainPipe.io.refill_req <> missQueue.io.main_pipe_req
 
-  mainPipe.io.data_write_ready_dup := VecInit(Seq.fill(nDupDataWriteReady)(true.B)) 
-  mainPipe.io.tag_write_ready_dup := VecInit(Seq.fill(nDupDataWriteReady)(true.B)) 
-  mainPipe.io.wb_ready_dup := wb.io.req_ready_dup
+  mainPipe.io.data_write.ready := true.B
+  mainPipe.io.tag_write.ready := true.B
+  mainPipe.io.wb.ready := wb.io.req_ready_dup(0)
 
   //----------------------------------------
   // wb
